@@ -73,17 +73,23 @@ EFFECT_APPLIERS = {
 }
 
 
-def apply_random_effect(path, effect_names) -> str:
-    """Apply a randomly chosen effect (from `effect_names`) to the wav file at
-    `path`, in place. Returns the name of the effect that was applied."""
-    name = random.choice(effect_names)
+def apply_effect(path, effect_name: str) -> None:
+    """Apply a specific named effect (a key of EFFECT_APPLIERS) to the wav file
+    at `path`, in place."""
     audio, sr = sf.read(str(path), dtype="float32")
 
-    effected = EFFECT_APPLIERS[name](audio, sr)
+    effected = EFFECT_APPLIERS[effect_name](audio, sr)
 
     peak = float(np.max(np.abs(effected))) if effected.size else 0.0
     if peak > 1.0:
         effected = effected / peak
 
     sf.write(str(path), effected, sr, subtype="PCM_16")
+
+
+def apply_random_effect(path, effect_names) -> str:
+    """Apply a randomly chosen effect (from `effect_names`) to the wav file at
+    `path`, in place. Returns the name of the effect that was applied."""
+    name = random.choice(effect_names)
+    apply_effect(path, name)
     return name

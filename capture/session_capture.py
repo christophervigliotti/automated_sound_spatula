@@ -28,7 +28,7 @@ def get_sample_path(giblet_name: str, descriptor: str) -> Path:
     overwrites the previous file.
     """
     SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
-    return SAMPLES_DIR / f"{giblet_name}-{descriptor}.wav"
+    return SAMPLES_DIR / f"sample-{giblet_name}-{descriptor}.wav"
 
 
 def _new_engine() -> pyttsx3.Engine:
