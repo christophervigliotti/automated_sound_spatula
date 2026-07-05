@@ -1,6 +1,6 @@
 # Automated Sound Spatulas (A.S.S.)
 
-A collection of Python-based sound giblets
+A collection of Python-based sound giblets.  Can be run directly 
 
 ## Requirements
 
@@ -58,11 +58,27 @@ samples each, ordered per a randomly chosen mode from `SEQUENCE` (`random`, `asc
 from the full set. Each sample is played through a throwaway copy with the `EFFECT` applied
 (the original samples are never modified). At most `SAMPLES_AT_A_TIME` samples may play back
 overlapping at once -- once a new one starts, the oldest still-playing sample beyond that cap
-is stopped. Press Escape during a run to stop early. The whole run's effected samples are
-stitched together (with a gap matching the beat interval) into a session recording afterward,
-same as helloWorld.
+is stopped. The same sample is never played twice in a row, including across a loop boundary.
+Press Escape during a run to stop early. The whole run's effected samples are stitched
+together (with a gap matching the beat interval) into a session recording afterward, same as
+helloWorld.
 
 ## Other Stuff
+
+### Offal
+
+`offal/` holds orchestration scripts that chain multiple giblets together with custom
+overrides, rather than being giblets themselves. Each giblet's `play.py` exposes a `run()`
+function that accepts optional overrides (falling back to its module-level defaults when
+called with none), so `python giblets/<name>/play.py` still works standalone.
+
+- `offal/helloBrunswick.py`: deletes existing samples/sessions, runs helloWorld with custom
+  words (`WORDS`) without playing the result back, then sequences the resulting samples
+  through poopsPerMinute with a custom sequence mode and BPM (`POOPS_SEQUENCE`, `POOPS_BPM`).
+
+```
+.venv/bin/python offal/helloBrunswick.py
+```
 
 ### Capture
 

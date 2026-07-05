@@ -22,15 +22,38 @@ GIBLET_NAME = "poopsPerMinute"
 SOURCE_GIBLET = "helloWorld"
 
 BPM = 160
-SEQUENCE = ["random"] # , "ascending", "descending"
+SEQUENCE = ["stumbleForward"] # , "ascending", "descending", "random"
 LOOPS = [2]
 SAMPLES_PER_LOOP = [13]
 SAMPLES_AT_A_TIME = 2
 EFFECT = "reverb"
+STUMBLE_FORWARD_PERCENTANCE_CHANCE = 25
 
 
 def _source_samples() -> list[Path]:
     return sorted(SAMPLES_DIR.glob(f"sample-{SOURCE_GIBLET}-*.wav"))
+
+
+def _stumble_forward(samples: list[Path], percent_chance: float) -> list[Path]:
+    """Walk `samples` in ascending order one step at a time. After each step
+    there's a `percent_chance`% chance of stepping backward one word instead of
+    advancing (clamped at both ends), so the walk occasionally replays an
+    earlier word. Produces exactly len(samples) plays, same as the other modes,
+    so it may not always reach the last word."""
+    ordered = sorted(samples)
+    n = len(ordered)
+    if n == 0:
+        return []
+
+    walk = []
+    index = 0
+    for _ in range(n):
+        walk.append(ordered[index])
+        if random.uniform(0, 100) < percent_chance:
+            index = max(0, index - 1)
+        else:
+            index = min(n - 1, index + 1)
+    return walk
 
 
 def _ordered(samples: list[Path], sequence: str) -> list[Path]:
@@ -42,7 +65,44 @@ def _ordered(samples: list[Path], sequence: str) -> list[Path]:
         return sorted(samples)
     if sequence == "descending":
         return sorted(samples, reverse=True)
+    if sequence == "stumbleForward":
+        return _stumble_forward(samples, STUMBLE_FORWARD_PERCENTANCE_CHANCE)
     raise ValueError(f"unknown sequence: {sequence}")
+
+
+def _no_consecutive_repeats(samples: list[Path], previous: Path = None) -> list[Path]:
+    """Reorder `samples` (via local swaps) so no two adjacent entries are the
+    same sample, and the first entry doesn't match `previous` (the last sample
+    played before this list) either. Best-effort: gives up gracefully if a
+    conflict truly can't be resolved (e.g. every remaining sample is identical)."""
+    result = list(samples)
+    n = len(result)
+
+    for _ in range(n * 2):
+        conflict = next(
+            (
+                i
+                for i in range(n)
+                if (result[i - 1] if i > 0 else previous) == result[i] and result[i] is not None
+            ),
+            None,
+        )
+        if conflict is None:
+            break
+
+        conflict_prev = result[conflict - 1] if conflict > 0 else previous
+        swapped = False
+        for j in range(conflict + 1, n):
+            next_after_j = result[j + 1] if j + 1 < n else None
+            if result[j] != conflict_prev and result[conflict] != next_after_j:
+                result[conflict], result[j] = result[j], result[conflict]
+                swapped = True
+                break
+
+        if not swapped:
+            break
+
+    return result
 
 
 def _prune_finished(
@@ -68,7 +128,12 @@ def _escape_pressed_during(seconds: float) -> bool:
     return bool(ready) and sys.stdin.read(1) == ESCAPE_KEY
 
 
-def run() -> None:
+def run(sequence: list[str] = None, bpm: float = None) -> None:
+    """Run the sequencer. `sequence` overrides SEQUENCE (a single mode name is
+    also accepted); `bpm` overrides BPM."""
+    sequence_options = [sequence] if isinstance(sequence, str) else (sequence or SEQUENCE)
+    beats_per_minute = bpm if bpm is not None else BPM
+
     all_samples = _source_samples()
     if not all_samples:
         raise RuntimeError(
@@ -76,12 +141,13 @@ def run() -> None:
             f"run giblets/{SOURCE_GIBLET}/play.py first."
         )
 
-    beat_seconds = 60.0 / BPM
+    beat_seconds = 60.0 / beats_per_minute
     samples_per_loop = SAMPLES_PER_LOOP[0]
 
-    pool = all_samples[:]
+    pool: list[Path] = all_samples[:]
     active: list[tuple[subprocess.Popen, Path]] = []
     played_paths: list[Path] = []
+    last_played: Path = None
     escaped = False
 
     interactive = sys.stdin.isatty()
@@ -96,16 +162,20 @@ def run() -> None:
             if escaped:
                 break
 
-            if len(pool) < samples_per_loop:
-                print("ran out of samples -- refilling the pool")
-                pool = all_samples[:]
+            this_loop_samples = []
+            while len(this_loop_samples) < samples_per_loop:
+                if not pool:
+                    print("ran out of samples -- restarting the pool with a new group")
+                    pool = all_samples[:]
+                this_loop_samples.append(pool.pop(0))
 
-            this_loop_samples = [pool.pop(0) for _ in range(samples_per_loop)]
-            sequence = random.choice(SEQUENCE)
-            ordered_samples = _ordered(this_loop_samples, sequence)
-            print(f"loop {loop_number}: {sequence} -> {[p.name for p in ordered_samples]}")
+            seq = random.choice(sequence_options)
+            ordered_samples = _ordered(this_loop_samples, seq)
+            ordered_samples = _no_consecutive_repeats(ordered_samples, previous=last_played)
+            print(f"loop {loop_number}: {seq} -> {[p.name for p in ordered_samples]}")
 
             for path in ordered_samples:
+                last_played = path
                 effected_path = _effected_copy(path, EFFECT)
                 played_paths.append(effected_path)
 
