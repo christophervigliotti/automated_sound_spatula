@@ -8,13 +8,21 @@ A collection of Python-based sound giblets
 * MacOS (for now, deal with it)
 * Speakers set to 'on'
 
+```
+get it up and running
+code goes here
+```
+
 ## Giblets
 
 ### Hello World
 
-Speaks the `SPEAKS_THESE_WORDS` string using synthesized speech (`pyttsx3`), pausing between
-words and sentences (`PAUSE_BETWEEN_WORDS_SECONDS` / `PAUSE_BETWEEN_SENTENCES_SECONDS`), and
-captures each word as a numbered sample (`helloWorld-word-001.wav`, `-002.wav`, ...).
+Speaks the `SPEAKS_THESE_WORDS` string live, with a random pitch per word (`PITCH_RANGE`)
+and a pause between every word (`PAUSE_FROM_SILENCE_UNTIL_NEXT_WORD`), and separately
+captures each word as a silent, non-playing numbered sample (`helloWorld-word-001.wav`,
+`-002.wav`, ...) with its own random pitch. Both use the classic `Alex` voice
+(`PITCH_CAPABLE_VOICE`) since macOS's modern "compact" voices (the system default) largely
+ignore pitch commands.
 
 ```
 python3 -m venv .venv
@@ -36,3 +44,11 @@ python3 -m venv .venv
   reusable clip to the `samples/` folder, named `gibletName-descriptor.wav`. Samples aren't
   timestamped, so capturing the same descriptor again overwrites the previous file, and stay
   free of any pause padding so they're clean for reuse.
+
+### Samples
+
+Some Giblets capture audio segments for resample etc.  Those segments are stored here.
+
+### Sessions
+
+Giblet session audio files are captured here.

@@ -52,16 +52,22 @@ def _transcode_to_wav(raw_path: Path, dest_path: Path) -> None:
     raw_path.unlink()
 
 
-def capture_session(text: str, giblet_name: str, when: Optional[datetime] = None) -> Path:
+def capture_session(
+    text: str, giblet_name: str, when: Optional[datetime] = None, voice: Optional[str] = None
+) -> Path:
     """Speak `text` aloud and save the full session to the sessions folder.
 
     `text` may include macOS speech embedded commands (e.g. `[[slnc 500]]` for a
     500ms pause) so pauses are captured naturally as part of the spoken audio.
+    `voice` overrides the system default voice (see `capture_sample` for why
+    that matters for embedded commands like `[[pbas N]]`).
     """
     dest_path = get_session_path(giblet_name, when)
     raw_path = dest_path.with_suffix(".aiff")
 
     engine = _new_engine()
+    if voice:
+        engine.setProperty("voice", voice)
     engine.say(text)
     engine.save_to_file(text, str(raw_path))
     engine.runAndWait()
@@ -71,12 +77,21 @@ def capture_session(text: str, giblet_name: str, when: Optional[datetime] = None
     return dest_path
 
 
-def capture_sample(text: str, giblet_name: str, descriptor: str) -> Path:
-    """Render `text` to a reusable sample without playing it aloud, overwriting any prior capture."""
+def capture_sample(text: str, giblet_name: str, descriptor: str, voice: Optional[str] = None) -> Path:
+    """Render `text` to a reusable sample without playing it aloud, overwriting any prior capture.
+
+    `voice` overrides the system default voice. This matters for embedded
+    commands: macOS's modern "compact" voices (e.g. the default en-US
+    Samantha) largely ignore commands like `[[pbas N]]` (pitch base), while
+    classic voices (e.g. `com.apple.speech.synthesis.voice.Alex`) respond to
+    them with an audible, measurable difference.
+    """
     dest_path = get_sample_path(giblet_name, descriptor)
     raw_path = dest_path.with_suffix(".aiff")
 
     engine = _new_engine()
+    if voice:
+        engine.setProperty("voice", voice)
     engine.save_to_file(text, str(raw_path))
     engine.runAndWait()
     engine.stop()
