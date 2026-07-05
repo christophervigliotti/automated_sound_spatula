@@ -17,18 +17,37 @@ code goes here
 
 ### Hello World
 
-Speaks the `SPEAKS_THESE_WORDS` string live, with a random pitch per word (`PITCH_RANGE`)
-and a pause between every word (`PAUSE_FROM_SILENCE_UNTIL_NEXT_WORD`), and separately
-captures each word as a silent, non-playing numbered sample (`helloWorld-word-001.wav`,
-`-002.wav`, ...) with its own random pitch. Both use the classic `Alex` voice
-(`PITCH_CAPABLE_VOICE`) since macOS's modern "compact" voices (the system default) largely
-ignore pitch commands.
+#### Dependencies
+None
 
+#### Usage
 ```
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python giblets/helloWorld/play.py
 ```
+
+#### Description
+
+#### Bland Technical Descripton 
+Captures each word of `SPEAKS_THESE_WORDS`, spoken at `SPEECH_RATE` words per minute, as its
+own numbered sample (`helloWorld-word-001.wav`, `-002.wav`, ...), applies a random effect
+from `EFFECTS_NAMES` (reverb, delay, phaser, distortion, pitch shift) to each one, then
+stitches the effected samples back together with a `PAUSE_FROM_SILENCE_UNTIL_NEXT_WORD` gap
+between them into the session recording, and plays that back.
+
+
+### Poops Per Minute
+
+#### Dependencies
+
+Samples (from Hello World)
+
+#### Usage
+
+#### Description
+
+#### Bland Technical Descripton 
 
 ## Other Stuff
 
@@ -42,8 +61,18 @@ python3 -m venv .venv
   embedded commands (e.g. `[[slnc 500]]` for a 500ms pause) so pauses are captured naturally.
 - `capture_sample(text, giblet_name, descriptor)` renders (without playing aloud) and saves a
   reusable clip to the `samples/` folder, named `gibletName-descriptor.wav`. Samples aren't
-  timestamped, so capturing the same descriptor again overwrites the previous file, and stay
-  free of any pause padding so they're clean for reuse.
+  timestamped, so capturing the same descriptor again overwrites the previous file.
+- `build_session_from_clips(clip_paths, giblet_name, gap_seconds)` stitches already-rendered
+  wav clips (e.g. effected samples) together with silence gaps into a session recording.
+- `play_wav(path)` plays a wav file aloud via macOS's built-in `afplay`.
+
+### Effects
+
+`capture/effects.py` applies audio effects to an already-captured wav file, in place, via
+`apply_random_effect(path, effect_names)`. Reverb, distortion, and pitch shift come from
+[audiomentations](https://github.com/iver56/audiomentations) (MIT-licensed, independently
+maintained, not corporate-backed); delay and phaser aren't in its transform set, so they're
+hand-rolled with plain numpy.
 
 ### Samples
 
