@@ -7,12 +7,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from capture.effects import apply_random_effect
+from capture.sequencing import pop_by_direction
 from capture.session_capture import build_session_from_clips, capture_sample, play_wav
 
 GIBLET_NAME = "helloWorld"
 #SPEAKS_THESE_WORDS = "hills whores liquor stores"
 SPEAKS_THESE_WORDS = "mushy squishy beautiful unclear irritating. a dummy getting shot with a bowling ball."
 PAUSE_FROM_SILENCE_UNTIL_NEXT_WORD = .0125
+SAMPLE_DIRECTION = 'alternating-toggle' # can be 'forward', 'backward', alternating-random or alternating-toggle
 
 # Words per minute; pyttsx3's macOS driver defaults to 200.
 SPEECH_RATE = 130
@@ -29,17 +31,20 @@ def _sentences(speaks_these_words: str) -> list[list[str]]:
 
 
 def capture_samples(speaks_these_words: str) -> list[Path]:
+    words = [word for sentence in _sentences(speaks_these_words) for word in sentence]
+
     sample_paths = []
     word_number = 0
+    last_side = None
 
-    for words in _sentences(speaks_these_words):
-        for word in words:
-            word_number += 1
-            descriptor = f"{word_number:04d}"
-            path = capture_sample(word, GIBLET_NAME, descriptor, rate=SPEECH_RATE)
-            effect = apply_random_effect(path, EFFECTS_NAMES)
-            print(f"applied {effect} to {path.name}")
-            sample_paths.append(path)
+    while words:
+        word, last_side = pop_by_direction(words, SAMPLE_DIRECTION, last_side)
+        word_number += 1
+        descriptor = f"{word_number:04d}"
+        path = capture_sample(word, GIBLET_NAME, descriptor, rate=SPEECH_RATE)
+        effect = apply_random_effect(path, EFFECTS_NAMES)
+        print(f"applied {effect} to {path.name}")
+        sample_paths.append(path)
 
     return sample_paths
 

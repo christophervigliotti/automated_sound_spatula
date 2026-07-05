@@ -2,7 +2,11 @@
 
 ![Giblets](images/giblets.webp)
 
-A collection of Python-based sound giblets.  Can be run directly 
+A collection of Python-based sound giblets.  Can be run directly or combined into beautiful offal.
+
+## Why?!
+
+Experimental audio is a thing.
 
 ## Requirements
 
@@ -50,7 +54,9 @@ Captures each word of `SPEAKS_THESE_WORDS`, spoken at `SPEECH_RATE` words per mi
 own numbered sample (`sample-helloWorld-0001.wav`, `-0002.wav`, ...), applies a random effect
 from `EFFECTS_NAMES` (reverb, delay, phaser, distortion, pitch shift) to each one, then
 stitches the effected samples back together with a `PAUSE_FROM_SILENCE_UNTIL_NEXT_WORD` gap
-between them into the session recording, and plays that back.
+between them into the session recording, and plays that back. `SAMPLE_DIRECTION` controls
+which order the words are captured/numbered in: `forward`, `backward`, `alternating-random`,
+or `alternating-toggle` (strictly alternates between the front and back of the word list).
 
 
 ### Poops Per Minute
@@ -72,7 +78,9 @@ like it's had a few too many.
 
 #### Bland Technical Descripton
 
-Sequences the existing `samples/sample-helloWorld-*.wav` pool in `LOOPS` loops of `SAMPLES_PER_LOOP`
+Sequences the existing `samples/sample-helloWorld-*.wav` pool, drawn per `SAMPLE_DIRECTION`
+(`forward`, `backward`, `alternating-random`, or `alternating-toggle` between the front and
+back of the pool), in `LOOPS` loops of `SAMPLES_PER_LOOP`
 samples each, ordered per a randomly chosen mode from `SEQUENCE` (`random`, `ascending`,
 `descending`, `stumbleForward`), played at `BPM`. `stumbleForward` walks the words first to
 last, with a `STUMBLE_FORWARD_PERCENTANCE_CHANCE`% chance at each step of moving back one
@@ -83,9 +91,13 @@ from the full set. Each sample is played through a throwaway copy with the `EFFE
 (the original samples are never modified). At most `SAMPLES_AT_A_TIME` samples may play back
 overlapping at once -- once a new one starts, the oldest still-playing sample beyond that cap
 is stopped. The same sample is never played twice in a row, including across a loop boundary.
-Press Escape during a run to stop early. The whole run's effected samples are stitched
-together (with a gap matching the beat interval) into a session recording afterward, same as
-helloWorld.
+Press Escape during a run to stop early. When `DICED_UP_NICE` is on, each sample is trimmed
+down to a fixed `DICED_UP_NICE_SLICE_SECONDS`-long section from its middle before playing, so
+every hit is the same length. When `MIRROR_UNIVERSE_CAVE` is on, each sample also fires a
+second, reversed, half-volume copy of itself `MIRROR_UNIVERSE_CAVE_OFFSET_SECONDS` later as an
+echo layer, mixed into the saved session at that same offset. The whole run's primary effected
+samples (plus any echo layer) are stitched/mixed together (with a gap matching the beat
+interval between primary hits) into a session recording afterward, same as helloWorld.
 
 ## Other Stuff
 
@@ -96,12 +108,13 @@ overrides, rather than being giblets themselves. Each giblet's `play.py` exposes
 function that accepts optional overrides (falling back to its module-level defaults when
 called with none), so `python giblets/<name>/play.py` still works standalone.
 
-- `offal/helloBrunswick.py`: deletes existing samples/sessions, runs helloWorld with custom
-  words (`WORDS`) without playing the result back, then sequences the resulting samples
-  through poopsPerMinute with a custom sequence mode and BPM (`POOPS_SEQUENCE`, `POOPS_BPM`).
+- `offal/sloppy.py`: deletes existing samples/sessions, runs helloWorld with custom words
+  (`WORDS`, an offal/giblets definition) without playing the result back, then sequences the
+  resulting samples through poopsPerMinute with a custom sequence mode and BPM
+  (`POOPS_SEQUENCE`, `POOPS_BPM`).
 
 ```
-.venv/bin/python offal/helloBrunswick.py
+.venv/bin/python offal/sloppy.py
 ```
 
 ### Capture
@@ -115,8 +128,10 @@ called with none), so `python giblets/<name>/play.py` still works standalone.
 - `capture_sample(text, giblet_name, descriptor)` renders (without playing aloud) and saves a
   reusable clip to the `samples/` folder, named `sample-gibletName-descriptor.wav`. Samples
   aren't timestamped, so capturing the same descriptor again overwrites the previous file.
-- `build_session_from_clips(clip_paths, giblet_name, gap_seconds)` stitches already-rendered
-  wav clips (e.g. effected samples) together with silence gaps into a session recording.
+- `build_session_from_clips(clip_paths, giblet_name, gap_seconds, echo_paths=None, echo_offset_seconds=0.0)`
+  stitches already-rendered wav clips (e.g. effected samples) together with silence gaps into
+  a session recording. If `echo_paths` is given (one entry per clip, `None` for no echo), each
+  echo clip is additively mixed in starting `echo_offset_seconds` after its clip begins.
 - `play_wav(path)` plays a wav file aloud via macOS's built-in `afplay`.
 
 ### Effects
@@ -145,3 +160,5 @@ files, are left alone).
 .venv/bin/python util/delete_samples.py
 .venv/bin/python util/delete_sessions.py
 ```
+
+

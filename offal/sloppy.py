@@ -10,7 +10,7 @@ from util import delete_samples, delete_sessions
 
 WORDS = "offal is also called variety meats, pluck or organ meats, is the internal organs of a butchered animal.  offal is giblets.  giblets are a culinary term for the edible offal of a fowl, typically including the heart, gizzard, liver, and other organs "
 POOPS_SEQUENCE = "stumbleForward"
-POOPS_BPM = 80
+POOPS_BPM = 180
 
 
 def run() -> None:

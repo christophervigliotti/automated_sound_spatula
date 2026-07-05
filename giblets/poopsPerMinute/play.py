@@ -8,18 +8,23 @@ import subprocess
 import sys
 import tempfile
 import termios
+import threading
 import time
 import tty
 from pathlib import Path
+
+import soundfile as sf
 
 ESCAPE_KEY = "\x1b"
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from capture.effects import apply_effect
+from capture.sequencing import pop_by_direction
 from capture.session_capture import SAMPLES_DIR, build_session_from_clips
 
 GIBLET_NAME = "poopsPerMinute"
 SOURCE_GIBLET = "helloWorld"
+SAMPLE_DIRECTION = 'alternating-toggle' # can be 'forward', 'backward', alternating-random or alternating-toggle
 
 BPM = 160
 SEQUENCE = ["stumbleForward"] # , "ascending", "descending", "random"
@@ -28,6 +33,12 @@ SAMPLES_PER_LOOP = [13]
 SAMPLES_AT_A_TIME = 2
 EFFECT = "reverb"
 STUMBLE_FORWARD_PERCENTANCE_CHANCE = 25
+DICED_UP_NICE = 1 # when set to 1, grab a small section from the middle of each sample to play.  make the length of each section the same
+DICED_UP_NICE_SLICE_SECONDS = 0.67
+MIRROR_UNIVERSE_CAVE = 1 # when set to 1, play an offset of each sample reversed and at half volume as a second stream.  it should sound like an echo.
+MIRROR_UNIVERSE_CAVE_OFFSET_SECONDS = 0.125
+MIRROR_UNIVERSE_CAVE_VOLUME_REDUCTIO_PERCENTAGE_FROM_PREVIOUS = 25
+MIRROR_UNIVERSE_CAVE_NUMBER_OF_BOUNCES = 3
 
 
 def _source_samples() -> list[Path]:
@@ -128,6 +139,42 @@ def _effected_copy(path: Path, effect_name: str) -> Path:
     return tmp_path
 
 
+def _dice_middle(path: Path, length_seconds: float) -> None:
+    """Trim the wav at `path`, in place, down to a `length_seconds`-long
+    section from its middle. No-op if the audio is already that short or
+    shorter, so every diced sample is the same length."""
+    audio, sr = sf.read(str(path), dtype="float32")
+    slice_length = int(sr * length_seconds)
+    if slice_length >= len(audio):
+        return
+
+    start = (len(audio) - slice_length) // 2
+    sf.write(str(path), audio[start : start + slice_length], sr, subtype="PCM_16")
+
+
+def _mirror_echo_copy(path: Path) -> Path:
+    """Create a throwaway temp copy of `path`, reversed and at half volume, for
+    the MIRROR_UNIVERSE_CAVE echo effect."""
+    audio, sr = sf.read(str(path), dtype="float32")
+    mirrored = audio[::-1] * 0.5
+    tmp_path = Path(tempfile.mkstemp(suffix=".wav")[1])
+    sf.write(str(tmp_path), mirrored, sr, subtype="PCM_16")
+    return tmp_path
+
+
+def _play_delayed(path: Path, offset_seconds: float) -> threading.Thread:
+    """Play `path` aloud on a background thread, delayed by `offset_seconds`.
+    Returns the thread so callers can join it before cleaning up the file."""
+
+    def _fire():
+        time.sleep(offset_seconds)
+        subprocess.run(["afplay", str(path)])
+
+    thread = threading.Thread(target=_fire, daemon=True)
+    thread.start()
+    return thread
+
+
 def _escape_pressed_during(seconds: float) -> bool:
     """Wait up to `seconds`, returning True as soon as Escape is pressed on stdin."""
     ready, _, _ = select.select([sys.stdin], [], [], seconds)
@@ -153,7 +200,10 @@ def run(sequence: list[str] = None, bpm: float = None) -> None:
     pool: list[Path] = all_samples[:]
     active: list[tuple[subprocess.Popen, Path]] = []
     played_paths: list[Path] = []
+    mirror_paths: list[Path] = []
+    mirror_threads: list[threading.Thread] = []
     last_played: Path = None
+    last_pool_side = None
     escaped = False
 
     interactive = sys.stdin.isatty()
@@ -173,7 +223,8 @@ def run(sequence: list[str] = None, bpm: float = None) -> None:
                 if not pool:
                     print("ran out of samples -- restarting the pool with a new group")
                     pool = all_samples[:]
-                this_loop_samples.append(pool.pop(0))
+                sample, last_pool_side = pop_by_direction(pool, SAMPLE_DIRECTION, last_pool_side)
+                this_loop_samples.append(sample)
 
             seq = random.choice(sequence_options)
             ordered_samples = _ordered(this_loop_samples, seq)
@@ -183,10 +234,21 @@ def run(sequence: list[str] = None, bpm: float = None) -> None:
             for path in ordered_samples:
                 last_played = path
                 effected_path = _effected_copy(path, EFFECT)
+                if DICED_UP_NICE:
+                    _dice_middle(effected_path, DICED_UP_NICE_SLICE_SECONDS)
                 played_paths.append(effected_path)
 
                 active[:] = _prune_finished(active)
                 active.append((subprocess.Popen(["afplay", str(effected_path)]), effected_path))
+
+                if MIRROR_UNIVERSE_CAVE:
+                    mirror_path = _mirror_echo_copy(effected_path)
+                    mirror_paths.append(mirror_path)
+                    mirror_threads.append(
+                        _play_delayed(mirror_path, MIRROR_UNIVERSE_CAVE_OFFSET_SECONDS)
+                    )
+                else:
+                    mirror_paths.append(None)
 
                 while len(active) > SAMPLES_AT_A_TIME:
                     oldest_proc, _ = active.pop(0)
@@ -211,11 +273,23 @@ def run(sequence: list[str] = None, bpm: float = None) -> None:
         if proc.poll() is None:
             proc.wait()
 
-    session_path = build_session_from_clips(played_paths, GIBLET_NAME, gap_seconds=beat_seconds)
+    for thread in mirror_threads:
+        thread.join(timeout=5)
+
+    session_path = build_session_from_clips(
+        played_paths,
+        GIBLET_NAME,
+        gap_seconds=beat_seconds,
+        echo_paths=mirror_paths if MIRROR_UNIVERSE_CAVE else None,
+        echo_offset_seconds=MIRROR_UNIVERSE_CAVE_OFFSET_SECONDS,
+    )
     print(f"Saved session to {session_path}")
 
     for tmp_path in played_paths:
         tmp_path.unlink(missing_ok=True)
+    for tmp_path in mirror_paths:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

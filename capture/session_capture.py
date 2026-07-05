@@ -87,22 +87,56 @@ def capture_session(
 
 
 def build_session_from_clips(
-    clip_paths: list[Path], giblet_name: str, gap_seconds: float, when: Optional[datetime] = None
+    clip_paths: list[Path],
+    giblet_name: str,
+    gap_seconds: float,
+    when: Optional[datetime] = None,
+    echo_paths: Optional[list] = None,
+    echo_offset_seconds: float = 0.0,
 ) -> Path:
     """Stitch already-rendered wav clips (e.g. effected samples) together with
     `gap_seconds` of silence between each, saving the result as the session
-    recording."""
+    recording.
+
+    If `echo_paths` is given (one entry per clip, `None` for a clip with no
+    echo), each echo clip is additively mixed into the output starting
+    `echo_offset_seconds` after its corresponding primary clip begins (peak
+    normalized afterward if the mix clips).
+    """
     dest_path = get_session_path(giblet_name, when)
 
     clips = []
+    starts = []
     sr = 22050
+    cursor = 0
     for i, path in enumerate(clip_paths):
         audio, sr = sf.read(str(path), dtype="float32")
+        starts.append(cursor)
         clips.append(audio)
+        cursor += len(audio)
         if i < len(clip_paths) - 1:
-            clips.append(np.zeros(int(sr * gap_seconds), dtype=np.float32))
+            gap = np.zeros(int(sr * gap_seconds), dtype=np.float32)
+            clips.append(gap)
+            cursor += len(gap)
 
     combined = np.concatenate(clips) if clips else np.zeros(0, dtype=np.float32)
+
+    if echo_paths:
+        offset_samples = int(sr * echo_offset_seconds)
+        for start, echo_path in zip(starts, echo_paths):
+            if echo_path is None:
+                continue
+            echo_audio, _ = sf.read(str(echo_path), dtype="float32")
+            offset = start + offset_samples
+            if offset >= len(combined):
+                continue
+            usable = echo_audio[: len(combined) - offset]
+            combined[offset : offset + len(usable)] += usable
+
+        peak = float(np.max(np.abs(combined))) if combined.size else 0.0
+        if peak > 1.0:
+            combined = combined / peak
+
     sf.write(str(dest_path), combined, sr, subtype="PCM_16")
     return dest_path
 
