@@ -11,6 +11,8 @@ GIBLET_NAME = "helloWorld"
 SPEAKS_THESE_WORDS = "mushy squishy beautiful unclear irritating words."
 PAUSE_BETWEEN_WORDS_SECONDS = .5
 PAUSE_BETWEEN_SENTENCES_SECONDS = .5
+PAUSE_FROM_SILENCE_UNTIL_NEXT_WORD = .25
+AGE_RANGE = [5,100]
 
 
 def _sentences() -> list[list[str]]:
