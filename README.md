@@ -1,5 +1,7 @@
 # Automated Sound Spatulas (A.S.S.)
 
+![Giblets](images/giblets.webp)
+
 A collection of Python-based sound giblets.  Can be run directly 
 
 ## Requirements
@@ -9,9 +11,19 @@ A collection of Python-based sound giblets.  Can be run directly
 * Speakers set to 'on'
 
 ```
-get it up and running
-code goes here
+open terminal, then
+
+git clone https://github.com/christophervigliotti/automated_sound_spatula.git
+
+cd automated_sound_spatula
+
+python3 -m venv .venv
+
+.venv/bin/pip install -r requirements.txt
+
+Then pick a giblet below and run it.  or run an offal.
 ```
+
 
 ## Giblets
 
@@ -28,6 +40,10 @@ python3 -m venv .venv
 ```
 
 #### Description
+The mad scientist's mouth. Type in any words you want, and it puts them through a haunted
+text-to-speech machine, mangles each one with a random audio effect, and hands you back a
+pile of ready-to-abuse sound bites. Every other giblet in this repo lives off of what Hello
+World cooks up.
 
 #### Bland Technical Descripton 
 Captures each word of `SPEAKS_THESE_WORDS`, spoken at `SPEECH_RATE` words per minute, as its
@@ -49,12 +65,20 @@ Samples (from Hello World)
 ```
 
 #### Description
+A tempo-locked toilet symphony. Grabs whatever Hello World left lying around, drenches it in
+reverb/delay/distortion, and loops it into an overlapping, glitchy little drum machine made
+entirely of spoken garbage. Comes with a `stumbleForward` mode for when the beat should sound
+like it's had a few too many.
 
 #### Bland Technical Descripton
 
 Sequences the existing `samples/sample-helloWorld-*.wav` pool in `LOOPS` loops of `SAMPLES_PER_LOOP`
 samples each, ordered per a randomly chosen mode from `SEQUENCE` (`random`, `ascending`,
-`descending`), played at `BPM`. If the pool runs low on unused samples mid-run, it refills
+`descending`, `stumbleForward`), played at `BPM`. `stumbleForward` walks the words first to
+last, with a `STUMBLE_FORWARD_PERCENTANCE_CHANCE`% chance at each step of moving back one
+word instead of advancing; after a stumble, the next two steps always advance forward before
+another stumble can trigger (so it may replay earlier words and not always reach the last
+one). If the pool runs low on unused samples mid-run, it refills
 from the full set. Each sample is played through a throwaway copy with the `EFFECT` applied
 (the original samples are never modified). At most `SAMPLES_AT_A_TIME` samples may play back
 overlapping at once -- once a new one starts, the oldest still-playing sample beyond that cap

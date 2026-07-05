@@ -37,9 +37,10 @@ def _source_samples() -> list[Path]:
 def _stumble_forward(samples: list[Path], percent_chance: float) -> list[Path]:
     """Walk `samples` in ascending order one step at a time. After each step
     there's a `percent_chance`% chance of stepping backward one word instead of
-    advancing (clamped at both ends), so the walk occasionally replays an
-    earlier word. Produces exactly len(samples) plays, same as the other modes,
-    so it may not always reach the last word."""
+    advancing (clamped at both ends). After a stumble, the next two steps
+    always advance forward (no chance rolled) before stumbling can trigger
+    again. Produces exactly len(samples) plays, same as the other modes, so it
+    may not always reach the last word."""
     ordered = sorted(samples)
     n = len(ordered)
     if n == 0:
@@ -47,10 +48,15 @@ def _stumble_forward(samples: list[Path], percent_chance: float) -> list[Path]:
 
     walk = []
     index = 0
+    recovery_steps_remaining = 0
     for _ in range(n):
         walk.append(ordered[index])
-        if random.uniform(0, 100) < percent_chance:
+        if recovery_steps_remaining > 0:
+            recovery_steps_remaining -= 1
+            index = min(n - 1, index + 1)
+        elif random.uniform(0, 100) < percent_chance:
             index = max(0, index - 1)
+            recovery_steps_remaining = 2
         else:
             index = min(n - 1, index + 1)
     return walk
